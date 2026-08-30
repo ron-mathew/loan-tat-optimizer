@@ -1,4 +1,12 @@
+import sys, io
 import pandas as pd
+
+# Fix Windows charmap encoding issues with Unicode characters in print output
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 from ml.predictor import DelayPredictor
 
 # If ANY of these conditions are true, risk is upgraded to at least this level
@@ -77,7 +85,7 @@ class RiskAgent:
 
         # Add override reasons first (most critical)
         for r in override_reasons:
-            risk_drivers.append(f"⚠ Override: {r}")
+            risk_drivers.append(f"[!] Override: {r}")
 
         try:
             if float(row.get("doc_complete_pct", 100)) < 75:

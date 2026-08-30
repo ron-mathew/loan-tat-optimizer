@@ -41,6 +41,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080",
+        # Vercel deployments — replace with your exact URL after first deploy
+        "https://*.vercel.app",
         "*",
     ],
     allow_credentials=True,
@@ -100,25 +102,39 @@ class BatchInput(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def sanitize(obj):
-    if isinstance(obj, dict):
-        return {k: sanitize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [sanitize(i) for i in obj]
-    if isinstance(obj, float):
-        import math
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        return obj
-    if isinstance(obj, (pd.Series, pd.DataFrame)):
-        return obj.to_dict()
+    import math
     try:
         import numpy as np
-        if isinstance(obj, (np.integer,)):  return int(obj)
-        if isinstance(obj, (np.floating,)): return float(obj)
-        if isinstance(obj, (np.ndarray,)):  return obj.tolist()
-        if isinstance(obj, (np.bool_,)):    return bool(obj)
+        _has_numpy = True
     except ImportError:
-        pass
+        _has_numpy = False
+
+    if _has_numpy:
+        # Handle numpy scalars FIRST — before the generic float/int checks
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            f = float(obj)
+            return None if (math.isnan(f) or math.isinf(f)) else f
+        if isinstance(obj, np.ndarray):
+            # Recursively sanitize converted array so nested NaNs are cleaned
+            return sanitize(obj.tolist())
+
+    if isinstance(obj, (pd.Series, pd.DataFrame)):
+        # Recursively sanitize the converted dict so NaN columns are cleaned
+        return sanitize(obj.to_dict())
+
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+
+    if isinstance(obj, dict):
+        return {k: sanitize(v) for k, v in obj.items()}
+
+    if isinstance(obj, list):
+        return [sanitize(i) for i in obj]
+
     return obj
 
 
@@ -614,3 +630,11 @@ def clear_history(db: Session = Depends(get_db)):
     db.query(LoanSuggestion).delete()
     db.commit()
     return {"deleted": count, "message": f"Cleared {count} records."}
+
+
+# ── Static Files (Single-container deployment fallback) ──────────────────────
+from fastapi.staticfiles import StaticFiles
+
+frontend_dist = os.path.join(ROOT, "frontend", "dist")
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
