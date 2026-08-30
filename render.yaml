@@ -7,6 +7,8 @@ services:
     region: oregon
     plan: free
     healthCheckPath: /health
+    # Give models time to load in background before health checks start
+    initialDeployHook: "sleep 5"
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"

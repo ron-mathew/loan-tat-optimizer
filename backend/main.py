@@ -53,23 +53,33 @@ app.add_middleware(
 # ── Orchestrator singleton ─────────────────────────────────────────────────
 orchestrator: Optional[Orchestrator] = None
 explainer:    Optional[RAGExplainer] = None
+_models_loading: bool = False
+
+def _load_models_background():
+    """Load heavy ML models in a background thread so the health check
+    endpoint can respond immediately (prevents Render exit-128 OOM kill)."""
+    global orchestrator, explainer, _models_loading
+    _models_loading = True
+    try:
+        print("[startup] Loading Orchestrator (background)…")
+        orchestrator = Orchestrator(verbose=False)
+        print("[startup] Orchestrator ready ✅")
+    except Exception as e:
+        print(f"[startup] WARNING: Orchestrator failed to load: {e}")
+
+    try:
+        print("[startup] Loading RAG Explainer (background)…")
+        explainer = RAGExplainer()
+        print("[startup] RAG Explainer ready ✅")
+    except Exception as e:
+        print(f"[startup] WARNING: RAGExplainer failed to load: {e}")
+    _models_loading = False
 
 @app.on_event("startup")
 def load_orchestrator():
-    global orchestrator, explainer
-    try:
-        print("Loading Orchestrator…")
-        orchestrator = Orchestrator(verbose=False)
-        print("Orchestrator ready ✅")
-    except Exception as e:
-        print(f"WARNING: Orchestrator failed to load: {e}")
-
-    try:
-        print("Loading RAG Explainer…")
-        explainer = RAGExplainer()
-        print("RAG Explainer ready ✅")
-    except Exception as e:
-        print(f"WARNING: RAGExplainer failed to load: {e}")
+    import threading
+    t = threading.Thread(target=_load_models_background, daemon=True)
+    t.start()
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────
@@ -248,8 +258,9 @@ def root():
 @app.get("/health", tags=["Health"])
 def health():
     return {
-        "status":       "ok",
-        "orchestrator": "loaded" if orchestrator else "not loaded",
+        "status":        "ok",
+        "orchestrator":  "loaded" if orchestrator else ("loading" if _models_loading else "not loaded"),
+        "rag_explainer": "loaded" if explainer    else ("loading" if _models_loading else "not loaded"),
     }
 
 
