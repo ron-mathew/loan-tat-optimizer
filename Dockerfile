@@ -20,11 +20,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
+# Copy requirements and install (torch CPU index declared inside requirements.txt)
 COPY requirements.txt .
-# Install CPU-only torch first (smaller than default CUDA build) then the rest
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy entire project source
 COPY . .
