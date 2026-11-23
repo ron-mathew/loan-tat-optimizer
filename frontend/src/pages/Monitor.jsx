@@ -90,8 +90,10 @@ export default function Monitor() {
           loadSessionData();
         }, 3500);
       }
-    } catch {
-      setError("Could not load monitoring data. The backend AI models may still be warming up.");
+    } catch (err) {
+      console.error("Monitor loadSessionData error:", err);
+      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || String(err);
+      setError(`Could not load session monitoring: ${detail}`);
     }
   }, []);
 
@@ -142,10 +144,16 @@ export default function Monitor() {
 
   if (loading) return <div style={{ display: "flex", flexDirection: "column", gap: 20 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>{[...Array(3)].map((_, i) => <CardSkeleton key={i} rows={2} />)}</div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}><CardSkeleton rows={5} /><CardSkeleton rows={5} /></div></div>;
 
-  if (error) return <Card><div style={{ color: "#F87171", fontSize: "0.82rem", marginBottom: 12 }}>{error}</div><button onClick={loadAll} style={{ background: "rgba(20,184,166,0.08)", color: "#34D399", border: "1px solid rgba(52,211,153,0.18)", borderRadius: 7, padding: "7px 16px", cursor: "pointer", fontSize: "0.78rem" }}>Retry</button></Card>;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* Optional error alert if session stats failed */}
+      {error && (
+        <div style={{ padding: "10px 16px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ color: "#F87171", fontSize: "0.80rem" }}>{error}</span>
+          <button onClick={loadAll} style={{ background: "rgba(239,68,68,0.1)", color: "#FCA5A5", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: "0.72rem" }}>Retry</button>
+        </div>
+      )}
 
       {/* Status */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: isOnline ? "rgba(52,211,153,0.04)" : isLoading ? "rgba(251,191,36,0.04)" : "rgba(248,113,113,0.04)", border: `1px solid ${isOnline ? "rgba(52,211,153,0.14)" : isLoading ? "rgba(251,191,36,0.18)" : "rgba(248,113,113,0.14)"}`, borderRadius: 8 }}>

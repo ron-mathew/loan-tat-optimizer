@@ -14,11 +14,11 @@ const getBaseUrl = () => {
   if (typeof window !== "undefined" && (window.location.port === "5173" || window.location.port === "3000")) {
     return "http://localhost:8000";
   }
-  // 3. Unified deployment (same origin on Render/Docker)
-  if (typeof window !== "undefined" && window.location.origin) {
+  // 3. Single-container deployment on Render (same domain)
+  if (typeof window !== "undefined" && window.location.hostname.includes("onrender.com")) {
     return window.location.origin;
   }
-  // 4. Production fallback — point directly to Render
+  // 4. Production fallback (Vercel, custom domain, etc.) — always point directly to Render
   return RENDER_URL;
 };
 

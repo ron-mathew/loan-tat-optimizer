@@ -389,17 +389,15 @@ def batch_analyze(payload: BatchInput, db: Session = Depends(get_db)):
 @app.get("/stats", tags=["Monitoring"])
 def system_stats():
     if not orchestrator:
-        if _models_loading:
-            return {
-                "status": "loading",
-                "message": "AI models are still initializing in the background. Please wait a few moments...",
-                "total_loans": 0,
-                "sla_alert_count": 0,
-                "sla_alert_rate": 0,
-                "action_distribution": {},
-                "risk_distribution": {}
-            }
-        raise HTTPException(status_code=503, detail="Orchestrator not loaded.")
+        return {
+            "status": "loading" if _models_loading else "offline",
+            "message": "AI models are still initializing in the background. Please wait a few moments..." if _models_loading else "Orchestrator not loaded.",
+            "total_loans": 0,
+            "sla_alert_count": 0,
+            "sla_alert_rate": 0,
+            "action_distribution": {},
+            "risk_distribution": {}
+        }
     try:
         summary = orchestrator.get_system_summary()
         return sanitize(summary)
@@ -410,12 +408,19 @@ def system_stats():
 @app.get("/metrics", tags=["Metrics"])
 def business_metrics():
     if not orchestrator:
-        if _models_loading:
-            return {
-                "status": "loading",
-                "message": "AI models are still initializing in the background. Please wait a few moments...",
-            }
-        raise HTTPException(status_code=503, detail="Orchestrator not loaded.")
+        return {
+            "status": "loading" if _models_loading else "offline",
+            "message": "AI models are still initializing in the background. Please wait a few moments..." if _models_loading else "Orchestrator not loaded.",
+            "dataset_size": 0,
+            "tat": {"mean": 0, "median": 0, "std": 0, "min": 0, "max": 0},
+            "sla_breach_rate": 0,
+            "baselines": {"no_intervention": 0, "random_agent": 0, "our_system": 0, "industry_avg": 20.0},
+            "improvements": {"vs_random": 0, "vs_no_interv": 0, "vs_industry": 0},
+            "risk_distribution": {},
+            "sla_by_risk": {},
+            "stage_breakdown": {},
+            "loan_type_tat": {}
+        }
     try:
         df = orchestrator.df.copy()
         total = len(df)
