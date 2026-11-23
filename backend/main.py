@@ -389,6 +389,16 @@ def batch_analyze(payload: BatchInput, db: Session = Depends(get_db)):
 @app.get("/stats", tags=["Monitoring"])
 def system_stats():
     if not orchestrator:
+        if _models_loading:
+            return {
+                "status": "loading",
+                "message": "AI models are still initializing in the background. Please wait a few moments...",
+                "total_loans": 0,
+                "sla_alert_count": 0,
+                "sla_alert_rate": 0,
+                "action_distribution": {},
+                "risk_distribution": {}
+            }
         raise HTTPException(status_code=503, detail="Orchestrator not loaded.")
     try:
         summary = orchestrator.get_system_summary()
@@ -400,6 +410,11 @@ def system_stats():
 @app.get("/metrics", tags=["Metrics"])
 def business_metrics():
     if not orchestrator:
+        if _models_loading:
+            return {
+                "status": "loading",
+                "message": "AI models are still initializing in the background. Please wait a few moments...",
+            }
         raise HTTPException(status_code=503, detail="Orchestrator not loaded.")
     try:
         df = orchestrator.df.copy()

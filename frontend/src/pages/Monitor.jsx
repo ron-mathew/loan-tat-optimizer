@@ -3,10 +3,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/pages/Monitor.jsx
 import { useEffect, useState, useCallback } from "react";
-import { getStats, getHealth } from "../api";
+import { getStats, getHealth, getHistoryStats, getHistory, clearHistory } from "../api";
 import { Card, SectionTitle, StatTile, CardSkeleton, Empty, CSSBarChart, RiskBadge, ActionBadge, SLAPill } from "../components/UI";
 
-const API = "http://localhost:8000";
 const RISK_COLORS = { High: "#F87171", Medium: "#FBBF24", Low: "#34D399" };
 const ACTION_COLORS = { "Wait": "#64748B", "Fast-track": "#34D399", "Reassign Officer": "#FBBF24", "Request Documents": "#60A5FA", "Escalate Priority": "#F87171" };
 
@@ -82,22 +81,32 @@ export default function Monitor() {
   const [clearConfirm, setClearConfirm] = useState(false);
 
   const loadSessionData = useCallback(async () => {
-    try { const [s, h] = await Promise.all([getStats(), getHealth()]); setStats(s); setHealth(h); }
-    catch { setError("Could not load monitoring data. Ensure the backend is running on port 8000."); }
+    try {
+      const [s, h] = await Promise.all([getStats(), getHealth()]);
+      setStats(s);
+      setHealth(h);
+      if (s?.status === "loading" || h?.orchestrator === "loading") {
+        setTimeout(() => {
+          loadSessionData();
+        }, 3500);
+      }
+    } catch {
+      setError("Could not load monitoring data. The backend AI models may still be warming up.");
+    }
   }, []);
 
   const loadDbStats = useCallback(async () => {
-    try { const res = await fetch(`${API}/history/stats`); if (res.ok) setDbStats(await res.json()); } catch { }
+    try { const data = await getHistoryStats(); setDbStats(data); } catch { }
   }, []);
 
   const loadHistory = useCallback(async (page = 1, risk = "", source = "") => {
     setHistoryLoading(true);
     try {
-      const params = new URLSearchParams({ page, limit: historyLimit });
-      if (risk) params.append("risk", risk);
-      if (source) params.append("source", source);
-      const res = await fetch(`${API}/history?${params}`);
-      if (res.ok) { const data = await res.json(); setHistory(data.records || []); setHistoryTotal(data.total || 0); setHistoryPages(data.pages || 1); setHistoryPage(page); }
+      const data = await getHistory(page, historyLimit, risk, source);
+      setHistory(data.records || []);
+      setHistoryTotal(data.total || 0);
+      setHistoryPages(data.pages || 1);
+      setHistoryPage(page);
     } catch { } finally { setHistoryLoading(false); }
   }, [historyLimit]);
 
@@ -111,7 +120,7 @@ export default function Monitor() {
   useEffect(() => { loadHistory(1, riskFilter, sourceFilter); }, [riskFilter, sourceFilter]); // eslint-disable-line
 
   const handleClearHistory = async () => {
-    try { await fetch(`${API}/history`, { method: "DELETE" }); setClearConfirm(false); await Promise.all([loadDbStats(), loadHistory(1, riskFilter, sourceFilter)]); }
+    try { await clearHistory(); setClearConfirm(false); await Promise.all([loadDbStats(), loadHistory(1, riskFilter, sourceFilter)]); }
     catch { alert("Could not clear history."); }
   };
 
@@ -121,6 +130,7 @@ export default function Monitor() {
   const riskDist = stats?.risk_distribution || {};
   const actionDist = stats?.action_distribution || {};
   const isOnline = health?.orchestrator === "loaded";
+  const isLoading = health?.orchestrator === "loading" || stats?.status === "loading";
   const noData = totalLoans === 0 && (!dbStats || dbStats.total_records === 0);
 
   const riskData = Object.entries(riskDist).filter(([k]) => ["High", "Medium", "Low"].includes(k)).map(([k, v]) => ({ name: k, value: v }));
@@ -138,12 +148,13 @@ export default function Monitor() {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* Status */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: isOnline ? "rgba(52,211,153,0.04)" : "rgba(248,113,113,0.04)", border: `1px solid ${isOnline ? "rgba(52,211,153,0.14)" : "rgba(248,113,113,0.14)"}`, borderRadius: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: isOnline ? "rgba(52,211,153,0.04)" : isLoading ? "rgba(251,191,36,0.04)" : "rgba(248,113,113,0.04)", border: `1px solid ${isOnline ? "rgba(52,211,153,0.14)" : isLoading ? "rgba(251,191,36,0.18)" : "rgba(248,113,113,0.14)"}`, borderRadius: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: isOnline ? "#34D399" : "#F87171" }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: isOnline ? "#34D399" : isLoading ? "#FBBF24" : "#F87171" }} />
           <span style={{ fontSize: "0.78rem", color: "#64748B" }}>
-            Backend <strong style={{ color: isOnline ? "#34D399" : "#F87171" }}>{health?.status || "unknown"}</strong>
-            {" · "}Orchestrator <strong style={{ color: isOnline ? "#34D399" : "#F87171" }}>{health?.orchestrator || "unknown"}</strong>
+            Backend <strong style={{ color: isOnline ? "#34D399" : isLoading ? "#FBBF24" : "#F87171" }}>{health?.status || "unknown"}</strong>
+            {" · "}Orchestrator <strong style={{ color: isOnline ? "#34D399" : isLoading ? "#FBBF24" : "#F87171" }}>{health?.orchestrator || (isLoading ? "warming up…" : "offline")}</strong>
+            {isLoading && <span style={{ color: "#FBBF24", marginLeft: 6 }}>(initializing AI models in background, auto-refreshing...)</span>}
             {dbStats?.total_records > 0 && <span style={{ color: "#334155" }}>{" · "}<span style={{ color: "#38BDF8" }}>{dbStats.total_records.toLocaleString()}</span> records in DB</span>}
           </span>
         </div>
