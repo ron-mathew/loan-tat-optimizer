@@ -386,6 +386,7 @@ def batch_analyze(payload: BatchInput, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Return serialization error: {str(e)}\\n{traceback.format_exc()}")
 
 
+@app.get("/session/summary", tags=["Monitoring"])
 @app.get("/stats", tags=["Monitoring"])
 def system_stats():
     if not orchestrator:
@@ -405,6 +406,7 @@ def system_stats():
         raise HTTPException(status_code=500, detail=f"Stats error: {str(e)}")
 
 
+@app.get("/business/metrics", tags=["Metrics"])
 @app.get("/metrics", tags=["Metrics"])
 def business_metrics():
     if not orchestrator:

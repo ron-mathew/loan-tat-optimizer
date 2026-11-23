@@ -82,9 +82,22 @@ export default function Monitor() {
 
   const loadSessionData = useCallback(async () => {
     try {
-      const [s, h] = await Promise.all([getStats(), getHealth()]);
-      setStats(s);
-      setHealth(h);
+      const [sRes, hRes] = await Promise.allSettled([getStats(), getHealth()]);
+      if (hRes.status === "fulfilled") {
+        setHealth(hRes.value);
+      }
+      if (sRes.status === "fulfilled") {
+        setStats(sRes.value);
+        setError(null);
+      } else {
+        const err = sRes.reason;
+        console.error("Monitor getStats error:", err);
+        const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || String(err);
+        setError(`Could not load session monitoring: ${detail}`);
+      }
+
+      const s = sRes.status === "fulfilled" ? sRes.value : null;
+      const h = hRes.status === "fulfilled" ? hRes.value : null;
       if (s?.status === "loading" || h?.orchestrator === "loading") {
         setTimeout(() => {
           loadSessionData();
@@ -92,8 +105,7 @@ export default function Monitor() {
       }
     } catch (err) {
       console.error("Monitor loadSessionData error:", err);
-      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || String(err);
-      setError(`Could not load session monitoring: ${detail}`);
+      setError(`Could not load session monitoring: ${err.message || err}`);
     }
   }, []);
 

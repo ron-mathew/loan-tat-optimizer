@@ -31,13 +31,13 @@ export const batchAnalyze = (loans) =>
   axios.post(`${BASE}/batch`, { loans }).then((r) => r.data);
 
 export const getStats = () =>
-  axios.get(`${BASE}/stats`).then((r) => r.data);
+  axios.get(`${BASE}/session/summary`).then((r) => r.data);
 
 export const getHealth = () =>
   axios.get(`${BASE}/health`).then((r) => r.data);
 
 export const getMetrics = () =>
-  axios.get(`${BASE}/metrics`).then((r) => r.data);
+  axios.get(`${BASE}/business/metrics`).then((r) => r.data);
 
 export const getDatasetSample = (n = 10) =>
   axios.get(`${BASE}/dataset/sample?n=${n}`).then((r) => r.data);
