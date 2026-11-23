@@ -245,8 +245,8 @@ def extract_frontend_fields(raw: dict) -> dict:
 
 # ── Routes ─────────────────────────────────────────────────────────────────
 
-@app.get("/", tags=["Health"])
-def root():
+@app.get("/api", tags=["Health"])
+def api_info():
     return {
         "service": "Loan TAT Optimizer API",
         "status":  "running",
@@ -647,5 +647,14 @@ def clear_history(db: Session = Depends(get_db)):
 from fastapi.staticfiles import StaticFiles
 
 frontend_dist = os.path.join(ROOT, "frontend", "dist")
-if os.path.exists(frontend_dist):
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+if os.path.exists(os.path.join(frontend_dist, "index.html")):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+else:
+    @app.get("/", tags=["Health"])
+    def root():
+        return {
+            "service": "Loan TAT Optimizer API",
+            "status":  "running",
+            "version": "1.0.0",
+            "docs":    "/docs",
+        }
